@@ -7,7 +7,9 @@
   },
   "ExpandedNodes": [
     "",
-    "\\out"
+    "\\.github",
+    "\\.github\\workflows"
   ],
+  "SelectedNode": "\\.gitignore",
   "PreviewInSolutionExplorer": false
 }
