@@ -17,6 +17,10 @@ set_target_properties(helloworld_cli PROPERTIES
     CXX_STANDARD_REQUIRED ON
 )
 
+target_include_directories(helloworld
+    PRIVATE "${CMAKE_BINARY_DIR}"
+)
+
 target_link_libraries(helloworld_cli PRIVATE
     helloworld
 )
