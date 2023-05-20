@@ -20,10 +20,6 @@ set_target_properties(helloworld_cli PROPERTIES
 target_link_libraries(helloworld_cli PRIVATE
     helloworld
 )
-target_link_libraries(test_version
-    ${Boost_LIBRARIES}
-    helloworld
-)
 
 if (MSVC)
     target_compile_options(helloworld_cli PRIVATE
