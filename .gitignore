@@ -1,6 +1,3 @@
 /build/
 /out
 /.vs
-/lib.cpp
-/lib.h
-test_version.cpp
