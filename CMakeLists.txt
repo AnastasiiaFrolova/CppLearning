@@ -27,7 +27,7 @@ if (MSVC)
     )
 else ()
     target_compile_options(helloworld_cli PRIVATE
-        -Wall -Wextra -pedantic -Werror
+        -Wall -Wextra -pedantic
     )
 endif()
 
