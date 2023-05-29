@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include <tuple>
-
+#include <algorithm>
 
 // ("",  '.') -> [""]
 // ("11", '.') -> ["11"]
@@ -31,25 +31,25 @@ std::vector<std::string> split(const std::string& str, char d)
 	return r;
 }
 
-void reverseSort(std::vector<std::tuple<std::string, std::string, std::string, std::string>>& data) {
+void reverseSort(std::vector<std::tuple<uint8_t, uint8_t, uint8_t, uint8_t>>& data) {
 	for (size_t idx_i = 0; idx_i + 1 < data.size(); ++idx_i) {
 		for (size_t idx_j = 0; idx_j + 1 < data.size() - idx_i; ++idx_j) {
-			if (stoi(std::get<0>(data[idx_j + 1])) > stoi(std::get<0>(data[idx_j]))) {
+			if (std::get<0>(data[idx_j + 1]) > std::get<0>(data[idx_j])) {
 				swap(data[idx_j], data[idx_j + 1]);
 			}
 			if (std::get<0>(data[idx_j + 1]) == std::get<0>(data[idx_j]) &&
-				stoi(std::get<1>(data[idx_j + 1])) > stoi(std::get<1>(data[idx_j]))) {
+				(std::get<1>(data[idx_j + 1]) > std::get<1>(data[idx_j]))) {
 				swap(data[idx_j], data[idx_j + 1]);
 			}
 			if (std::get<0>(data[idx_j + 1]) == std::get<0>(data[idx_j]) &&
 				std::get<1>(data[idx_j + 1]) == std::get<1>(data[idx_j]) &&
-				stoi(std::get<2>(data[idx_j + 1])) > stoi(std::get<2>(data[idx_j]))) {
+				std::get<2>(data[idx_j + 1]) > std::get<2>(data[idx_j])) {
 				swap(data[idx_j], data[idx_j + 1]);
 			}
 			if (std::get<0>(data[idx_j + 1]) == std::get<0>(data[idx_j]) &&
 				std::get<1>(data[idx_j + 1]) == std::get<1>(data[idx_j]) &&
 				std::get<2>(data[idx_j + 1]) == std::get<2>(data[idx_j]) &&
-				stoi(std::get<3>(data[idx_j + 1])) > stoi(std::get<3>(data[idx_j]))) {
+				std::get<3>(data[idx_j + 1]) > std::get<3>(data[idx_j])) {
 				swap(data[idx_j], data[idx_j + 1]);
 			}
 		}
@@ -60,7 +60,7 @@ int main(int argc, char const* argv[])
 {
 	try
 	{
-		std::vector<std::tuple<std::string, std::string, std::string, std::string>> ip_pool;
+		std::vector<std::tuple<uint8_t, uint8_t, uint8_t, uint8_t>> ip_pool;
 		auto parseStr = [](const std::string& str, char d)
 		{ std::vector<std::string> v = split(str, d); return std::make_tuple(v); };
 
@@ -70,19 +70,45 @@ int main(int argc, char const* argv[])
 
 			auto ip = std::get<0>(parseStr(line, '\t'))[0];
 			auto ipParts = std::get<0>(parseStr(ip, '.'));
-			ip_pool.push_back(std::make_tuple(ipParts[0], ipParts[1], ipParts[2], ipParts[3]));
+			ip_pool.push_back(std::make_tuple(stoi(ipParts[0]), stoi(ipParts[1]), stoi(ipParts[2]), stoi(ipParts[3])));
 		}
 		reverseSort(ip_pool);
 
 
 		// TODO reverse lexicographically sort
 
-		for (std::vector<std::tuple<std::string, std::string, std::string, std::string>>::const_iterator ip = ip_pool.cbegin(); ip != ip_pool.cend(); ++ip)
+		for (std::vector<std::tuple<uint8_t, uint8_t, uint8_t, uint8_t>>::const_iterator ip = ip_pool.cbegin(); ip != ip_pool.cend(); ++ip)
 		{
-			std::cout << std::get<0>(*ip) << "." << std::get<1>(*ip) << "." << std::get<2>(*ip) << "." << std::get<3>(*ip) << std::endl;
+			std::cout << std::to_string(std::get<0>(*ip)) << "." << std::to_string(std::get<1>(*ip)) << "." << std::to_string(std::get<2>(*ip)) << "." << std::to_string(std::get<3>(*ip)) << std::endl;
+		}
+		std::vector<std::tuple<uint8_t, uint8_t, uint8_t, uint8_t>> ip_pool_filtered_1; // 1 байт = 1
+		std::vector<std::tuple<uint8_t, uint8_t, uint8_t, uint8_t>> ip_pool_filtered_2; // 1 байт = 46, 2 байт = 70
+		std::vector<std::tuple<uint8_t, uint8_t, uint8_t, uint8_t>> ip_pool_filtered_3; // 1 байт = 46, 2 байт = 70
 
+		std::copy_if(ip_pool.begin(), ip_pool.end(), std::back_inserter(ip_pool_filtered_1), [](std::tuple<uint8_t, uint8_t, uint8_t, uint8_t> i) {
+			return std::get<0>(i) == 1;
+		});
+		std::copy_if(ip_pool.begin(), ip_pool.end(), std::back_inserter(ip_pool_filtered_2), [](std::tuple<uint8_t, uint8_t, uint8_t, uint8_t> i) {
+			return std::get<0>(i) == 46 && std::get<1>(i) == 70;
+		});
+		std::copy_if(ip_pool.begin(), ip_pool.end(), std::back_inserter(ip_pool_filtered_3), [](std::tuple<uint8_t, uint8_t, uint8_t, uint8_t> i) {
+			return std::get<0>(i) == 46 || std::get<1>(i) == 46 || std::get<2>(i) == 46 || std::get<3>(i) == 46;
+		});
+
+		for (std::vector<std::tuple<uint8_t, uint8_t, uint8_t, uint8_t>>::const_iterator ip = ip_pool_filtered_1.cbegin(); ip != ip_pool_filtered_1.cend(); ++ip)
+		{
+			std::cout << std::to_string(std::get<0>(*ip)) << "." << std::to_string(std::get<1>(*ip)) << "." << std::to_string(std::get<2>(*ip)) << "." << std::to_string(std::get<3>(*ip)) << std::endl;
 		}
 
+		for (std::vector<std::tuple<uint8_t, uint8_t, uint8_t, uint8_t>>::const_iterator ip = ip_pool_filtered_2.cbegin(); ip != ip_pool_filtered_2.cend(); ++ip)
+		{
+			std::cout << std::to_string(std::get<0>(*ip)) << "." << std::to_string(std::get<1>(*ip)) << "." << std::to_string(std::get<2>(*ip)) << "." << std::to_string(std::get<3>(*ip)) << std::endl;
+		}
+
+		for (std::vector<std::tuple<uint8_t, uint8_t, uint8_t, uint8_t>>::const_iterator ip = ip_pool_filtered_3.cbegin(); ip != ip_pool_filtered_3.cend(); ++ip)
+		{
+			std::cout << std::to_string(std::get<0>(*ip)) << "." << std::to_string(std::get<1>(*ip)) << "." << std::to_string(std::get<2>(*ip)) << "." << std::to_string(std::get<3>(*ip)) << std::endl;
+		}
 		// 222.173.235.246
 		// 222.130.177.64
 		// 222.82.198.61
