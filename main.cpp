@@ -39,7 +39,7 @@ public:
 		memoryPool.currentBlock_ = nullptr;
 		currentSlot_ = memoryPool.currentSlot_;
 		lastSlot_ = memoryPool.lastSlot_;
-		freeSlots_ = memoryPool.freeSlots;
+		freeSlots_ = memoryPool.freeSlots_;
 	};
 	template <class U> MemoryPool(const MemoryPool<U>& memoryPool) noexcept {};
 
