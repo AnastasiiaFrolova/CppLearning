@@ -183,7 +183,7 @@ public:
 			std::cout << "";
 		}
 
-		if (temp->next == NULL)
+		else if (temp->next == NULL)
 		{
 			std::cout << temp->val;
 		}
@@ -198,7 +198,7 @@ public:
 		}
 	}
 private:
-	Node* head;
+	Node* head = nullptr;
 	typename Alloc::template rebind<Node>::other nodeAlloc;
 };
 
