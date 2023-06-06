@@ -335,7 +335,8 @@ int main(int argc, char const* argv[])
 		for (size_t i = 0; i < 10; i++)
 			simple_m[i] = factorial(i);
 
-		auto allocated_m = std::map<int, int, MemoryPool<std::pair<int, int>>>{};
+		auto allocated_m = std::map<int, int, std::less<int>, MemoryPool<std::pair<const int, int>>>{};
+
 		for (size_t i = 0; i < 10; i++)
 			allocated_m[i] = factorial(i);
 
