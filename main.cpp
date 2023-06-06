@@ -7,177 +7,11 @@
 #include <bitset>
 #include <array>
 
-template <class T>
-class Pool_c
-{ // Basic type define
-public:
-	template <class U> Pool_c(const Pool_c <U>&) noexcept {}
-
-	typedef unsigned int uint;
-
-
-	uint m_numOfBlocks; // Num of blocks
-	uint m_sizeOfEachBlock; // Size of each block
-	uint m_numFreeBlocks; // Num of remaining blocks
-	uint m_numInitialized; // Num of initialized blocks
-	T* m_memStart; // Beginning of memory pool
-	T* m_next; // Num of next free block
-	typedef T value_type;
-	typedef T value_type;
-	typedef T* pointer;
-	typedef const T* const_pointer;
-	typedef T& reference;
-	typedef const T& const_reference;
-	Pool_c()
-	{
-		m_numOfBlocks = 0;
-		m_sizeOfEachBlock = 0;
-		m_numFreeBlocks = 0;
-		m_numInitialized = 0;
-		m_memStart = NULL;
-		m_next = 0;
-		CreatePool();
-	}
-	~Pool_c() { DestroyPool(); }
-	void CreatePool(size_t sizeOfEachBlock = sizeof(T),
-		uint numOfBlocks = 10)
-	{
-		m_numOfBlocks = numOfBlocks;
-		m_sizeOfEachBlock = sizeOfEachBlock;
-		m_memStart = new T[m_sizeOfEachBlock *
-			m_numOfBlocks];
-		m_numFreeBlocks = numOfBlocks;
-		m_next = m_memStart;
-	}
-	void DestroyPool()
-	{
-		delete[] m_memStart;
-		m_memStart = NULL;
-	}
-	T* AddrFromIndex(uint i) const
-	{
-		return m_memStart + (i * m_sizeOfEachBlock);
-	}
-	uint IndexFromAddr(const T* p) const
-	{
-		return (((uint)(p - m_memStart)) / m_sizeOfEachBlock);
-	}
-	void* allocate(int n)
-	{
-		if (m_numInitialized < m_numOfBlocks)
-		{
-			uint* p = (uint*)AddrFromIndex(m_numInitialized);
-			*p = m_numInitialized + 1;
-			m_numInitialized++;
-		}
-		void* ret = NULL;
-		if (m_numFreeBlocks > 0)
-		{
-			ret = (void*)m_next;
-			--m_numFreeBlocks;
-			if (m_numFreeBlocks != 0)
-			{
-				m_next = AddrFromIndex(*((uint*)m_next));
-			}
-			else
-			{
-				m_next = NULL;
-			}
-		}
-		return ret;
-	}
-	void deallocate(void* p)
-	{
-		if (m_next != NULL)
-		{
-			(*(uint*)p) = IndexFromAddr(m_next);
-			m_next = (T*)p;
-		}
-		else
-		{
-			*((uint*)p) = m_numOfBlocks;
-			m_next = (T*)p;
-		}
-		++m_numFreeBlocks;
-	}
-	template< class U >
-	struct rebind
-	{
-		typedef Pool_c<U> other;
-	};
-};
-
-template <class T>
-struct std_03_allocator {
-	typedef T value_type;
-	typedef T* pointer;
-
-	T* pool = nullptr;
-	unsigned int max_size = 10;
-	unsigned int free_slots_count = 10;
-	T* internal_array;
-	bool* flags;
-
-	std_03_allocator() noexcept {
-		internal_array = new T[max_size];
-		flags = new bool[max_size] {true};
-		//pool = static_cast<T*>(::operator new(10 * sizeof(T)));
-	}
-	template <class U> std_03_allocator(const std_03_allocator <U>&) noexcept {}
-
-	unsigned int get_free_index() {
-		if (this->flags == nullptr) return -1;
-		for (std::size_t i = 0; i < max_size; ++i) {
-			if (flags[i]) return i;
-		}
-		return -1;
-	}
-
-	T* allocate(std::size_t n)
-	{
-		unsigned int index = get_free_index();
-		if (this->free_slots_count <= 0) {
-			std::cout << this->free_slots_count << std::endl;
-		}
-		if (this->pool != nullptr) {
-			T* element_pointer = static_cast<T*>(this->pool + sizeof(T) * (10 - this->free_slots_count));
-
-			this->free_slots_count--;
-			return element_pointer;
-		}
-		else {
-			this->pool = static_cast<T*>(::operator new(10 * sizeof(T)));
-			this->free_slots_count = 10;
-			return this->pool;
-		}
-		//return static_cast<T*>(::operator new(n * sizeof(T)));
-	}
-	void deallocate(T* p, std::size_t n)
-	{
-		//::operator delete[](p);
-	}
-
-	template <class Up, class... Args>
-	void construct(Up* p, Args&&... args) {
-		::new ((void*)p) Up(std::forward<Args>(args)...);
-	}
-
-	void destroy(pointer p) {
-		//p->~T();
-	}
-
-	template< class U >
-	struct rebind
-	{
-		typedef std_03_allocator<U> other;
-	};
-};
 
 template <typename T, size_t BlockSize = 4096>
 class MemoryPool
 {
 public:
-	/* Member types */
 	typedef T               value_type;
 	typedef T* pointer;
 	typedef T& reference;
@@ -193,7 +27,6 @@ public:
 		typedef MemoryPool<U> other;
 	};
 
-	/* Member functions */
 	MemoryPool() noexcept {
 		currentBlock_ = nullptr;
 		currentSlot_ = nullptr;
@@ -235,7 +68,6 @@ public:
 	pointer address(reference x) const noexcept { return &x; };
 	const_pointer address(const_reference x) const noexcept { return &x; };
 
-	// Can only allocate one object at a time. n and hint are ignored
 	pointer allocate(size_type n = 1, const_pointer hint = 0) {
 		if (freeSlots_ != nullptr) {
 			pointer result = reinterpret_cast<pointer>(freeSlots_);
@@ -256,9 +88,7 @@ public:
 	};
 
 	size_type max_size() const noexcept {
-		size_type maxBlocks = -1 / BlockSize;
-		return (BlockSize - sizeof(data_pointer_)) / sizeof(slot_type_) * maxBlocks;
-		//return 10;
+		return 10;
 	};
 
 	template <class U, class... Args> void construct(U* p, Args&&... args) {
@@ -298,12 +128,10 @@ private:
 		return ((align - result) % align);
 	};
 	void allocateBlock() {
-		// Allocate space for the new block and store a pointer to the previous one
 		data_pointer_ newBlock = reinterpret_cast<data_pointer_>
 			(operator new(BlockSize));
 		reinterpret_cast<slot_pointer_>(newBlock)->next = currentBlock_;
 		currentBlock_ = reinterpret_cast<slot_pointer_>(newBlock);
-		// Pad block body to staisfy the alignment requirements for elements
 		data_pointer_ body = newBlock + sizeof(slot_pointer_);
 		size_type bodyPadding = padPointer(body, alignof(slot_type_));
 		currentSlot_ = reinterpret_cast<slot_pointer_>(body + bodyPadding);
@@ -314,6 +142,65 @@ private:
 	static_assert(BlockSize >= 2 * sizeof(slot_type_), "BlockSize too small.");
 };
 
+template <typename T, typename Alloc = std::allocator<T>>
+class MyList
+{
+	struct Node
+	{
+		Node* next;
+		T val;
+	};
+public:
+	void push_back(const T& val)
+	{
+		Node* newNode = nodeAlloc.allocate(1);
+		newNode->val = val;
+		newNode->next = NULL;
+
+		Node* tmp = head;
+		if (tmp != NULL)
+		{
+			while (tmp->next != NULL)
+			{
+				tmp = tmp->next;
+			}
+
+			tmp->next = newNode;
+		}
+		else
+		{
+			head = newNode;
+			//allocator = nodeAlloc;
+
+		}
+	}
+
+	void print() {
+		Node* temp = head;
+
+		if (temp == NULL)
+		{
+			std::cout << "";
+		}
+
+		if (temp->next == NULL)
+		{
+			std::cout << temp->val;
+		}
+		else
+		{
+			while (temp != NULL)
+			{
+				std::cout << temp->val;
+				temp = temp->next;
+				std::cout << std::endl;
+			}
+		}
+	}
+private:
+	Node* head;
+	typename Alloc::template rebind<Node>::other nodeAlloc;
+};
 
 unsigned factorial(unsigned n)
 {
@@ -336,55 +223,22 @@ int main(int argc, char const* argv[])
 			simple_m[i] = factorial(i);
 
 		auto allocated_m = std::map<int, int, std::less<int>, MemoryPool<std::pair<const int, int>>>{};
-
 		for (size_t i = 0; i < 10; i++)
 			allocated_m[i] = factorial(i);
+		for (const auto& p : allocated_m)
+		{
+			std::cout << p.first << " " << p.second << std::endl;
+		}
 
+		MyList<int> simple_l;
+		for (size_t i = 0; i < 10; i++)
+			simple_l.push_back(i);
 
-		//auto v1 = std::vector<int, pool>{};
+		MyList<int, MemoryPool<int>> allocated_l;
+		for (size_t i = 0; i < 10; i++)
+			allocated_l.push_back(i);
+		allocated_l.print();
 
-		//v1.push_back(1);
-		//v1.push_back(2);
-		//v1.push_back(3);
-		//v1.push_back(4);
-		//v1.push_back(5);
-		//v1.push_back(6);
-		//v1.push_back(7);
-		//v1.push_back(8);
-		//v1.push_back(9);
-		//v1.push_back(0);
-		//v1.push_back(0);
-		//v1.push_back(0);
-		//v1.push_back(0);
-		//v1.push_back(0);
-		//v1.push_back(0);
-
-		//auto allocated_m = std::vector<int, pool_allocator<int>>{};
-		//allocated_m.push_back(1);
-		//allocated_m.push_back(2);
-		//allocated_m.push_back(3);
-		//allocated_m.push_back(4);
-		//allocated_m.push_back(5);
-		//allocated_m.push_back(6);
-		//allocated_m.push_back(7);
-		//allocated_m.push_back(8);
-		////allocated_m.push_back(9);
-		////allocated_m.push_back(0);
-
-		//std::cout << allocated_m[0] << std::endl;
-		//std::cout << allocated_m[1] << std::endl;
-		//std::cout << allocated_m[2] << std::endl;
-
-
-
-		//std::cout << allocated_m[7];
-
-		//std::cout << allocated_l[0];
-		//for (size_t i = 0; i < 3; i++)
-		//	allocated_m[i] = factorial(i);
-
-		/*for (const auto& n : allocated_m)
-			std::cout << n.first << " = " << n.second << "; ";*/
 
 	}
 	catch (const std::exception& e)
