@@ -1,58 +1,161 @@
-#include <cassert>
-#include <cstdlib>
 #include <iostream>
-#include <string>
+#include <map>
 #include <vector>
-#include <tuple>
-#include <algorithm>
+#include <list>
+#include <stack>
+#include <mutex>
+#include <bitset>
+#include <array>
 
-// ("",  '.') -> [""]
-// ("11", '.') -> ["11"]
-// ("..", '.') -> ["", "", ""]
-// ("11.", '.') -> ["11", ""]
-// (".11", '.') -> ["", "11"]
-// ("11.22", '.') -> ["11", "22"]
-std::vector<std::string> split(const std::string& str, char d)
+template <typename T, size_t BlockSize = 4096>
+class MemoryPool
 {
-	std::vector<std::string> r;
+public:
+	/* Member types */
+	typedef T               value_type;
+	typedef T* pointer;
+	typedef T& reference;
+	typedef const T* const_pointer;
+	typedef const T& const_reference;
+	typedef size_t          size_type;
+	typedef ptrdiff_t       difference_type;
+	typedef std::false_type propagate_on_container_copy_assignment;
+	typedef std::true_type  propagate_on_container_move_assignment;
+	typedef std::true_type  propagate_on_container_swap;
 
-	std::string::size_type start = 0;
-	std::string::size_type stop = str.find_first_of(d);
-	while (stop != std::string::npos)
+	template <typename U> struct rebind {
+		typedef MemoryPool<U> other;
+	};
+
+	/* Member functions */
+	MemoryPool() noexcept {
+		currentBlock_ = nullptr;
+		currentSlot_ = nullptr;
+		lastSlot_ = nullptr;
+		freeSlots_ = nullptr;
+	};
+	MemoryPool(const MemoryPool& memoryPool) noexcept {};
+	MemoryPool(MemoryPool&& memoryPool) noexcept {
+		currentBlock_ = memoryPool.currentBlock_;
+		memoryPool.currentBlock_ = nullptr;
+		currentSlot_ = memoryPool.currentSlot_;
+		lastSlot_ = memoryPool.lastSlot_;
+		freeSlots_ = memoryPool.freeSlots;
+	};
+	template <class U> MemoryPool(const MemoryPool<U>& memoryPool) noexcept {};
+
+	~MemoryPool() noexcept
 	{
-		r.push_back(str.substr(start, stop - start));
-
-		start = stop + 1;
-		stop = str.find_first_of(d, start);
-	}
-
-	r.push_back(str.substr(start));
-
-	return r;
-}
-
-void reverseSort(std::vector<std::tuple<uint8_t, uint8_t, uint8_t, uint8_t>>& data) {
-	for (size_t idx_i = 0; idx_i + 1 < data.size(); ++idx_i) {
-		for (size_t idx_j = 0; idx_j + 1 < data.size() - idx_i; ++idx_j) {
-			if (std::get<0>(data[idx_j + 1]) > std::get<0>(data[idx_j])) {
-				swap(data[idx_j], data[idx_j + 1]);
-			}
-			if (std::get<0>(data[idx_j + 1]) == std::get<0>(data[idx_j]) &&
-				(std::get<1>(data[idx_j + 1]) > std::get<1>(data[idx_j]))) {
-				swap(data[idx_j], data[idx_j + 1]);
-			}
-			if (std::get<0>(data[idx_j + 1]) == std::get<0>(data[idx_j]) &&
-				std::get<1>(data[idx_j + 1]) == std::get<1>(data[idx_j]) &&
-				std::get<2>(data[idx_j + 1]) > std::get<2>(data[idx_j])) {
-				swap(data[idx_j], data[idx_j + 1]);
-			}
-			if (std::get<0>(data[idx_j + 1]) == std::get<0>(data[idx_j]) &&
-				std::get<1>(data[idx_j + 1]) == std::get<1>(data[idx_j]) &&
-				std::get<2>(data[idx_j + 1]) == std::get<2>(data[idx_j]) &&
-				std::get<3>(data[idx_j + 1]) > std::get<3>(data[idx_j])) {
-				swap(data[idx_j], data[idx_j + 1]);
-			}
+		slot_pointer_ curr = currentBlock_;
+		while (curr != nullptr) {
+			slot_pointer_ prev = curr->next;
+			operator delete(reinterpret_cast<void*>(curr));
+			curr = prev;
 		}
+	};
+
+	MemoryPool& operator=(const MemoryPool& memoryPool) = delete;
+	MemoryPool& operator=(MemoryPool&& memoryPool) noexcept {
+		if (this != &memoryPool)
+		{
+			std::swap(currentBlock_, memoryPool.currentBlock_);
+			currentSlot_ = memoryPool.currentSlot_;
+			lastSlot_ = memoryPool.lastSlot_;
+			freeSlots_ = memoryPool.freeSlots;
+		}
+		return *this;
+	};
+
+	pointer address(reference x) const noexcept { return &x; };
+	const_pointer address(const_reference x) const noexcept { return &x; };
+
+	// Can only allocate one object at a time. n and hint are ignored
+	pointer allocate(size_type n = 1, const_pointer hint = 0) {
+		if (freeSlots_ != nullptr) {
+			pointer result = reinterpret_cast<pointer>(freeSlots_);
+			freeSlots_ = freeSlots_->next;
+			return result;
+		}
+		else {
+			if (currentSlot_ >= lastSlot_)
+				allocateBlock();
+			return reinterpret_cast<pointer>(currentSlot_++);
+		}
+	};
+	void deallocate(pointer p, size_type n = 1) {
+		if (p != nullptr) {
+			reinterpret_cast<slot_pointer_>(p)->next = freeSlots_;
+			freeSlots_ = reinterpret_cast<slot_pointer_>(p);
+		}
+	};
+
+	size_type max_size() const noexcept {
+		size_type maxBlocks = -1 / BlockSize;
+		return (BlockSize - sizeof(data_pointer_)) / sizeof(slot_type_) * maxBlocks;
+	};
+
+	template <class U, class... Args> void construct(U* p, Args&&... args) {
+		new (p) U(std::forward<Args>(args)...);
+	};
+	template <class U> void destroy(U* p) { p->~U(); };
+
+	template <class... Args> pointer newElement(Args&&... args) {
+		pointer result = allocate();
+		construct<value_type>(result, std::forward<Args>(args)...);
+		return result;
+	};
+	void deleteElement(pointer p) {
+		if (p != nullptr) {
+			p->~value_type();
+			deallocate(p);
+		}
+	};
+
+private:
+	union Slot_ {
+		value_type element;
+		Slot_* next;
+	};
+
+	typedef char* data_pointer_;
+	typedef Slot_ slot_type_;
+	typedef Slot_* slot_pointer_;
+
+	slot_pointer_ currentBlock_;
+	slot_pointer_ currentSlot_;
+	slot_pointer_ lastSlot_;
+	slot_pointer_ freeSlots_;
+
+	size_type padPointer(data_pointer_ p, size_type align) const noexcept {
+		uintptr_t result = reinterpret_cast<uintptr_t>(p);
+		return ((align - result) % align);
+	};
+	void allocateBlock() {
+		// Allocate space for the new block and store a pointer to the previous one
+		data_pointer_ newBlock = reinterpret_cast<data_pointer_>
+			(operator new(BlockSize));
+		reinterpret_cast<slot_pointer_>(newBlock)->next = currentBlock_;
+		currentBlock_ = reinterpret_cast<slot_pointer_>(newBlock);
+		// Pad block body to staisfy the alignment requirements for elements
+		data_pointer_ body = newBlock + sizeof(slot_pointer_);
+		size_type bodyPadding = padPointer(body, alignof(slot_type_));
+		currentSlot_ = reinterpret_cast<slot_pointer_>(body + bodyPadding);
+		lastSlot_ = reinterpret_cast<slot_pointer_>
+			(newBlock + BlockSize - sizeof(slot_type_) + 1);
+	};
+
+	static_assert(BlockSize >= 2 * sizeof(slot_type_), "BlockSize too small.");
+};
+
+unsigned factorial(unsigned n)
+{
+	if (n < 0)
+		return(-1);
+	if (n == 0)
+		return(1);
+	else
+	{
+		return(n * factorial(n - 1));
 	}
 }
 
@@ -60,117 +163,17 @@ int main(int argc, char const* argv[])
 {
 	try
 	{
-		std::vector<std::tuple<uint8_t, uint8_t, uint8_t, uint8_t>> ip_pool;
-		auto parseStr = [](const std::string& str, char d)
-		{ std::vector<std::string> v = split(str, d); return std::make_tuple(v); };
+		auto simple_m = std::map<int, int>{};
 
-		for (std::string line; std::getline(std::cin, line);)
-		{
-			if (line.empty()) break;
+		for (size_t i = 0; i < 10; i++)
+			simple_m[i] = factorial(i);
 
-			auto ip = std::get<0>(parseStr(line, '\t'))[0];
-			auto ipParts = std::get<0>(parseStr(ip, '.'));
-			ip_pool.push_back(std::make_tuple(stoi(ipParts[0]), stoi(ipParts[1]), stoi(ipParts[2]), stoi(ipParts[3])));
-		}
-		reverseSort(ip_pool);
+		//why 03 allocators stateless
+		//pool_allocator<int> a1;
+		//auto current_pool = Pool<int>();
+		//auto& pool = current_pool::get_instance();
 
-
-		// TODO reverse lexicographically sort
-
-		for (std::vector<std::tuple<uint8_t, uint8_t, uint8_t, uint8_t>>::const_iterator ip = ip_pool.cbegin(); ip != ip_pool.cend(); ++ip)
-		{
-			std::cout << std::to_string(std::get<0>(*ip)) << "." << std::to_string(std::get<1>(*ip)) << "." << std::to_string(std::get<2>(*ip)) << "." << std::to_string(std::get<3>(*ip)) << std::endl;
-		}
-		std::vector<std::tuple<uint8_t, uint8_t, uint8_t, uint8_t>> ip_pool_filtered_1; // 1 байт = 1
-		std::vector<std::tuple<uint8_t, uint8_t, uint8_t, uint8_t>> ip_pool_filtered_2; // 1 байт = 46, 2 байт = 70
-		std::vector<std::tuple<uint8_t, uint8_t, uint8_t, uint8_t>> ip_pool_filtered_3; // 1 байт = 46, 2 байт = 70
-
-		std::copy_if(ip_pool.begin(), ip_pool.end(), std::back_inserter(ip_pool_filtered_1), [](std::tuple<uint8_t, uint8_t, uint8_t, uint8_t> i) {
-			return std::get<0>(i) == 1;
-		});
-		std::copy_if(ip_pool.begin(), ip_pool.end(), std::back_inserter(ip_pool_filtered_2), [](std::tuple<uint8_t, uint8_t, uint8_t, uint8_t> i) {
-			return std::get<0>(i) == 46 && std::get<1>(i) == 70;
-		});
-		std::copy_if(ip_pool.begin(), ip_pool.end(), std::back_inserter(ip_pool_filtered_3), [](std::tuple<uint8_t, uint8_t, uint8_t, uint8_t> i) {
-			return std::get<0>(i) == 46 || std::get<1>(i) == 46 || std::get<2>(i) == 46 || std::get<3>(i) == 46;
-		});
-
-		for (std::vector<std::tuple<uint8_t, uint8_t, uint8_t, uint8_t>>::const_iterator ip = ip_pool_filtered_1.cbegin(); ip != ip_pool_filtered_1.cend(); ++ip)
-		{
-			std::cout << std::to_string(std::get<0>(*ip)) << "." << std::to_string(std::get<1>(*ip)) << "." << std::to_string(std::get<2>(*ip)) << "." << std::to_string(std::get<3>(*ip)) << std::endl;
-		}
-
-		for (std::vector<std::tuple<uint8_t, uint8_t, uint8_t, uint8_t>>::const_iterator ip = ip_pool_filtered_2.cbegin(); ip != ip_pool_filtered_2.cend(); ++ip)
-		{
-			std::cout << std::to_string(std::get<0>(*ip)) << "." << std::to_string(std::get<1>(*ip)) << "." << std::to_string(std::get<2>(*ip)) << "." << std::to_string(std::get<3>(*ip)) << std::endl;
-		}
-
-		for (std::vector<std::tuple<uint8_t, uint8_t, uint8_t, uint8_t>>::const_iterator ip = ip_pool_filtered_3.cbegin(); ip != ip_pool_filtered_3.cend(); ++ip)
-		{
-			std::cout << std::to_string(std::get<0>(*ip)) << "." << std::to_string(std::get<1>(*ip)) << "." << std::to_string(std::get<2>(*ip)) << "." << std::to_string(std::get<3>(*ip)) << std::endl;
-		}
-		// 222.173.235.246
-		// 222.130.177.64
-		// 222.82.198.61
-		// ...
-		// 1.70.44.170
-		// 1.29.168.152
-		// 1.1.234.8
-
-		// TODO filter by first byte and output
-		// ip = filter(1)
-
-		// 1.231.69.33
-		// 1.87.203.225
-		// 1.70.44.170
-		// 1.29.168.152
-		// 1.1.234.8
-
-		// TODO filter by first and second bytes and output
-		// ip = filter(46, 70)
-
-		// 46.70.225.39
-		// 46.70.147.26
-		// 46.70.113.73
-		// 46.70.29.76
-
-		// TODO filter by any byte and output
-		// ip = filter_any(46)
-
-		// 186.204.34.46
-		// 186.46.222.194
-		// 185.46.87.231
-		// 185.46.86.132
-		// 185.46.86.131
-		// 185.46.86.131
-		// 185.46.86.22
-		// 185.46.85.204
-		// 185.46.85.78
-		// 68.46.218.208
-		// 46.251.197.23
-		// 46.223.254.56
-		// 46.223.254.56
-		// 46.182.19.219
-		// 46.161.63.66
-		// 46.161.61.51
-		// 46.161.60.92
-		// 46.161.60.35
-		// 46.161.58.202
-		// 46.161.56.241
-		// 46.161.56.203
-		// 46.161.56.174
-		// 46.161.56.106
-		// 46.161.56.106
-		// 46.101.163.119
-		// 46.101.127.145
-		// 46.70.225.39
-		// 46.70.147.26
-		// 46.70.113.73
-		// 46.70.29.76
-		// 46.55.46.98
-		// 46.49.43.85
-		// 39.46.86.85
-		// 5.189.203.46
+		std::vector<int, MemoryPool<int>> v1;
 	}
 	catch (const std::exception& e)
 	{
