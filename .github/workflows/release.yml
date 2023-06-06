@@ -5,6 +5,7 @@ on:
     branches:
       - lab1
       - lab2
+      - lab3
       - feature/github_actions
 
 jobs:
