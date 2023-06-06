@@ -45,13 +45,13 @@ if (MSVC)
     )
 else ()
     target_compile_options(helloworld_cli PRIVATE
-        -Wall -Wextra -pedantic
+        
     )
     target_compile_options(helloworld PRIVATE
-        -Wall -Wextra -pedantic
+       
     )
     target_compile_options(test_version PRIVATE
-        -Wall -Wextra -pedantic
+        
     )
 endif()
 

@@ -41,7 +41,7 @@ public:
 		lastSlot_ = memoryPool.lastSlot_;
 		freeSlots_ = memoryPool.freeSlots;
 	};
-	template <class U> MemoryPool(const MemoryPool<U>& memoryPool) noexcept {};
+	template <class U> MemoryPool(const MemoryPool<U>& memoryPool) noexcept {}
 
 	~MemoryPool() noexcept
 	{
@@ -93,14 +93,14 @@ public:
 
 	template <class U, class... Args> void construct(U* p, Args&&... args) {
 		new (p) U(std::forward<Args>(args)...);
-	};
-	template <class U> void destroy(U* p) { p->~U(); };
+	}
+	template <class U> void destroy(U* p) { p->~U(); }
 
 	template <class... Args> pointer newElement(Args&&... args) {
 		pointer result = allocate();
 		construct<value_type>(result, std::forward<Args>(args)...);
 		return result;
-	};
+	}
 	void deleteElement(pointer p) {
 		if (p != nullptr) {
 			p->~value_type();
