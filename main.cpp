@@ -167,7 +167,6 @@ int main(int argc, char const* argv[])
 
 		for (size_t i = 0; i < 10; i++)
 			simple_m[i] = factorial(i);
-		int f = 0;
 		//why 03 allocators stateless
 		//pool_allocator<int> a1;
 		//auto current_pool = Pool<int>();
