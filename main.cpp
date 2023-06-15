@@ -28,12 +28,11 @@ public:
 	};
 
 	MemoryPool() noexcept {
-		currentBlock_ = nullptr;
-		currentSlot_ = nullptr;
-		lastSlot_ = nullptr;
-		freeSlots_ = nullptr;
+		inicialize();
 	};
-	MemoryPool(const MemoryPool& memoryPool) noexcept {};
+	MemoryPool(const MemoryPool& memoryPool) noexcept {
+		inicialize();
+	};
 	MemoryPool(MemoryPool&& memoryPool) noexcept {
 		currentBlock_ = memoryPool.currentBlock_;
 		memoryPool.currentBlock_ = nullptr;
@@ -41,7 +40,7 @@ public:
 		lastSlot_ = memoryPool.lastSlot_;
 		freeSlots_ = memoryPool.freeSlots_;
 	};
-	template <class U> MemoryPool(const MemoryPool<U>& memoryPool) noexcept {};
+	//template <class U> MemoryPool(const MemoryPool<U>& memoryPool) noexcept {};
 
 	~MemoryPool() noexcept
 	{
@@ -109,6 +108,12 @@ public:
 	};
 
 private:
+	void inicialize() {
+		currentBlock_ = nullptr;
+		currentSlot_ = nullptr;
+		lastSlot_ = nullptr;
+		freeSlots_ = nullptr;
+	}
 	union Slot_ {
 		value_type element;
 		Slot_* next;
@@ -142,6 +147,18 @@ private:
 	static_assert(BlockSize >= 2 * sizeof(slot_type_), "BlockSize too small.");
 };
 
+template <class T, class U>
+constexpr bool operator== (const MemoryPool<T>& a1, const MemoryPool<U>& a2) noexcept
+{
+	return true;
+}
+
+template <class T, class U>
+constexpr bool operator!= (const MemoryPool<T>&, const MemoryPool<U>&) noexcept
+{
+	return false;
+}
+
 template <typename T, typename Alloc = std::allocator<T>>
 class MyList
 {
@@ -149,34 +166,27 @@ class MyList
 	{
 		Node* next;
 		T val;
+		Node(T _val) : val(_val), next(nullptr) {}
 	};
 public:
-	void push_back(const T& val)
+	MyList() : first(nullptr), last(nullptr) {
+	}
+	void push_back(const T& _val)
 	{
-		Node* newNode = nodeAlloc.allocate(1);
-		newNode->val = val;
-		newNode->next = NULL;
-
-		Node* tmp = head;
-		if (tmp != NULL)
-		{
-			while (tmp->next != NULL)
-			{
-				tmp = tmp->next;
-			}
-
-			tmp->next = newNode;
+		Node* p = nodeAlloc.allocate(1);
+		p->val = _val;
+		//Node* p = new Node(_val);
+		if (is_empty()) {
+			first = p;
+			last = p;
+			return;
 		}
-		else
-		{
-			head = newNode;
-			//allocator = nodeAlloc;
-
-		}
+		last->next = p;
+		last = p;
 	}
 
 	void print() {
-		Node* temp = head;
+		Node* temp = first;
 
 		if (temp == NULL)
 		{
@@ -198,8 +208,12 @@ public:
 		}
 	}
 private:
-	Node* head = nullptr;
+	Node* first;
+	Node* last;
 	typename Alloc::template rebind<Node>::other nodeAlloc;
+	bool is_empty() {
+		return first == nullptr;
+	}
 };
 
 unsigned factorial(unsigned n)
@@ -240,6 +254,8 @@ int main(int argc, char const* argv[])
 		allocated_l.print();
 
 
+		auto allocated_m2 = allocated_m;
+		allocated_m2[2] = 0;
 	}
 	catch (const std::exception& e)
 	{
