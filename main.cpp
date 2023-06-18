@@ -171,6 +171,21 @@ class MyList
 public:
 	MyList() : first(nullptr), last(nullptr) {
 	}
+	MyList(const MyList& other) : first(nullptr), last(nullptr) {
+		if (other.first) {
+			Node* current = other.first;
+			while (current) {
+				Node* next = current->next;
+				push_back(current->val);
+				current = next;
+			}
+		}
+	}
+	MyList& operator=(MyList other)
+	{
+		swap(*this, other);
+		return *this;
+	}
 	void push_back(const T& _val)
 	{
 		Node* p = nodeAlloc.allocate(1);
@@ -183,6 +198,19 @@ public:
 		}
 		last->next = p;
 		last = p;
+	}
+
+	~MyList() {
+		if (first) {
+			Node* current = first;
+			while (current) {
+				Node* next = current->next;
+				nodeAlloc.deallocate(current, 1);
+				current = next;
+			}
+		}
+		first = nullptr;
+		last = nullptr;
 	}
 
 	void print() {
@@ -251,6 +279,7 @@ int main(int argc, char const* argv[])
 		MyList<int, MemoryPool<int>> allocated_l;
 		for (size_t i = 0; i < 10; i++)
 			allocated_l.push_back(i);
+
 		allocated_l.print();
 
 
